@@ -172,4 +172,4 @@ def xinitDeploy(packageName):
     finally:    
         detach(online_session)
         
-xinitDeploy('com.ss.android.ugc.aweme')
+xinitDeploy('com.yaotong.crackme')
