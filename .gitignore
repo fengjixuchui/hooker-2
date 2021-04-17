@@ -2,7 +2,7 @@
 com.guazi*
 com.ganji*
 *.python-version
-*/xinit/spider.dex
+*/xinit/*.dex
 *pydevproject
 .hooker_driver
 .DS_Store

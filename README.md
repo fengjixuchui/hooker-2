@@ -12,7 +12,7 @@ hooker是一个基于frida实现的逆向工具包。为逆向开发人员提供
 =================
 
 * [hooker和frida、objection有什么不同](#hooker和frida-objection有什么不同)
-* [环境部署](#环境部署)
+* [hooker环境部署](#环境部署)
     * [1. git clone项目](#1-git-clone项目)
     * [2. 安装依赖](#2-安装依赖)
     * [3. 手机连接adb](#3-手机连接adb)
@@ -25,9 +25,10 @@ hooker是一个基于frida实现的逆向工具包。为逆向开发人员提供
 * [应用工作目录的命令](#应用工作目录的命令)
     * [1. hooking](#1-hooking)
     * [2. attach](#2-attach)
-    * [3. objection](#3-objection)
-    * [4. xinitdeploy](#4-xinitdeploy)
-    * [5. kill](#5-kill)
+    * [3. spawn](#3-spawn)
+    * [4. objection](#4-objection)
+    * [5. xinitdeploy](#5-xinitdeploy)
+    * [6. kill](#6-kill)
 * [应用工作目录的通杀脚本](#应用工作目录的通杀脚本)
     * [1. url.js](#1-urljs)
     * [2. activity_events.js](#2-activity_eventsjs)
@@ -38,6 +39,7 @@ hooker是一个基于frida实现的逆向工具包。为逆向开发人员提供
     * [7. text_view.js](#7-text_viewjs)
     * [8. ssl_log.js](#8-ssl_logjs)
     * [9. object_store.js](#9-object_storejs)
+    * [10. hook_RN.js](#10-hook_RNjs)
 * [hooker调试命令行](#hooker调试命令行)
     * [a-打印Activity栈](#a---打印activity栈)
     * [b-打印Service栈](#b---打印Service栈)
@@ -47,6 +49,7 @@ hooker是一个基于frida实现的逆向工具包。为逆向开发人员提供
     * [e-检测类在内存中是否存在](#e---检测类在内存中是否存在)
     * [s-正则表达式扫描类](#s---正则表达式扫描类)
     * [j-生成指定类的hook脚本](#j---生成指定类的hook脚本)
+    * [k-生成字符串hook脚本](#k---%E7%94%9F%E6%88%90%E5%AD%97%E7%AC%A6%E4%B8%B2hook%E8%84%9A%E6%9C%AC)
 * [hooker高级应用](#hooker高级应用)
     * [radar.dex](#radardex)
     * [脚本的内置函数](#脚本的内置函数)
@@ -58,6 +61,17 @@ hooker是一个基于frida实现的逆向工具包。为逆向开发人员提供
         * [6. getPrettyString(javaObject)](#6-getprettystringjavaobject)
         * [7. getField(javaObject, fieldName)](#7-getfieldjavaobject-fieldname)
         * [8. storeObjectAndLog(javaObject)](#8-storeobjectandlogjavaobject)
+    * [原生ui自动化](#原生ui自动化)
+        * [1. startActivity(activityName)](#1-startactivityactivityname)
+        * [2. contextStartActivity(activityName)](#1-startactivityactivityname)
+        * [3. contextStartActivity(activityName)](#1-startactivityactivityname)
+        * [4. home()](#1-startactivityactivityname)
+        * [5. back()](#1-startactivityactivityname)
+        * [6. finishCurrentActivity()](#1-startactivityactivityname)
+        * [7. clickByText(text)](#1-startactivityactivityname)
+        * [8. clickById(id)](#1-startactivityactivityname)
+        * [9. hover(x,y,upStepLength)](#1-startactivityactivityname)
+        * [10. viewTree()](#1-startactivityactivityname)
     * [远程frida支持](#远程frida支持)
 
 	
@@ -106,7 +120,9 @@ FA77C0301476	device
 
 
 ### 4. 手机开发环境部署
- 如果你的手机已经启动了frida-server，可以忽略这步。不过还是建议你采用hooker推荐的hluda-server，因为官方的frida-server在启动之后实际上会向app注入frida-agent.so作为代理，聪明的应用可以通过读取/proc/{pid}/maps检测到正在被frida调试。不过，已经有ju人帮我们重新编译了frida-server，把敏感特征去掉了。
+如果你的手机已经启动了frida-server，可以忽略这步。不过还是建议你采用hooker推荐的hluda-server，因为官方的frida-server在启动之后实际上会向app注入frida-agent.so作为代理，聪明的应用可以通过读取/proc/{pid}/maps检测到正在被frida调试。不过，已经有ju人帮我们重新编译了frida-server，把敏感特征去掉了。
+
+注意:部分手机出现部署之后adb连不上的问题，那请使用deploy2.sh。
 
 ```shell
 #以piexl2为例
@@ -122,6 +138,7 @@ stephen@ubuntu:~/hooker$ #如果你看到你的adb命令被弹出来了，表示
 ```
 ![部署演示](assets/hooker-deploy.gif)
 ***
+
 
 ### 5. 部署之后手机的增强功能
 - 1.关闭iptables防火墙，解决部分手机默认防火墙开启的问题
@@ -220,8 +237,8 @@ m: Discovering so module.
 ex: Exit to the upper layer. eg:'ex'
 : 
 ```
-	提示1: 第一次调试你的应用时hooker将在当前目录生成以进程Identifier命名的应用专有工作目录，并初始化生成一些你可能会用到的通杀脚本。
-	提示2: 成功attach一个应用时，命令将pause在等待输入调试指令的阶段。pause状态下使用命令进行高级调试请直接跳到
+提示1: 第一次调试你的应用时hooker将在当前目录生成以进程Identifier命名的应用专有工作目录，并初始化生成一些你可能会用到的通杀脚本。
+提示2: 成功attach一个应用时，命令将pause在等待输入调试指令的阶段。pause状态下使用命令进行高级调试请直接跳到[hooker调试命令行](#hooker调试命令行)
 ![](assets/hooker-attach.gif)
 
 
@@ -272,7 +289,17 @@ HOOKER_DRIVER=$(cat ../.hooker_driver)
 frida $HOOKER_DRIVER -l $1 com.ss.android.ugc.aweme
 ```
 
-### 3. objection
+### 3. spawn
+以spawn模式启动脚本。某些方法在应用启动的时候就初始化了，想要hook这些方法就必须以spawn模式启动了。默认是--no-pause，即不需要手动resume恢复应用。如果需要非--no-pause，请手动编辑spawn文件去除。以抖音工作目录为例，spawn实现如下
+
+```shell
+#!/bin/bash
+HOOKER_DRIVER=$(cat ../.hooker_driver)
+frida $HOOKER_DRIVER --no-pause -f com.ss.android.ugc.aweme -l $1
+```
+
+
+### 4. objection
 快捷执行objection调试命令，执行./objection即可。以抖音工作目录为例，objection实现如下
 
 ```shell
@@ -282,12 +309,12 @@ objection -d -g com.ss.android.ugc.aweme explore
 ```
 ![](assets/objection.gif)
 
-### 4. xinitdeploy
+### 5. xinitdeploy
 xinitdeploy是用于部署资源的命令，它会把xinit目录下所放的文件拷贝到手机上/data/user/0/{packageName}/xinit/。同时保证资源文件的user/group权限和app进程是同一个临时用户。
 ![](assets/xinitdeploy.gif)
 ![](assets/xinit_files.png)
 
-### 5. kill
+### 6. kill
 如果你想重启app，先执行./kill会杀掉应用的主进程和所有子进程。作为一个Andrioid应用开发工程师出身，然后干到后台，接着干到爬虫，现在干到逆向的我必须告诉你：每个手机厂商都会实现一个自己的“内存清理”工具效果不一定好，且可能app本身也有保活机制。所以不建议你通过操作手机滑动进程列表来杀——有可能杀不干净。以抖音工作目录为例，kill实现如下:
 
 ```shell
@@ -318,8 +345,11 @@ frida-kill $HOOKER_DRIVER com.ss.android.ugc.aweme
 ***
 
 ### 5. keystore_dump.js
-在https双向认证的情况下，dump客户端证书为p12. 存储位置:/data/user/0/{packagename}/client_keystore_{nowtime}.p12 证书密码: hooker。原理是hook java.security.KeyStore的getPrivateKey和getCertificate方法，因为客户端向服务发送证书必调这个方法。
-![](assets/keystore_dump.png)
+在https双向认证的情况下，dump客户端证书为p12。存储位置:/data/user/0/{packagename}/client_keystore_{nowtime}.p12 证书密码: hooker。原理是hook java.security.KeyStore的getPrivateKey和getCertificate方法，因为客户端向服务发送证书必调这个方法。强烈建议keystore_dump.js用spawn模式启动，启动命令为 ./spawn keystore_dump.js 。下面是某app双向认证dump客户端证书过程
+![](assets/https_bothway_01.png)
+![](assets/https_bothway_02.png)
+![](assets/https_bothway_03.png)
+![](assets/https_bothway_04.png)
 
 ### 6. edit_text.js
 跟踪获取Editview的getText()事件，并获取Editview的真实Class（很重要）。Editview一般绑定Search Action的实现代码，如果你抓取“搜索”接口。那么这个一定可以帮助你定位发送搜索请求的相关代码。多一种办法定位到关键逻辑不好吗？一定要靠分析网络请求吗？条条大路通罗马，不一定非从网络库分析！
@@ -334,6 +364,11 @@ frida-kill $HOOKER_DRIVER com.ss.android.ugc.aweme
 
 ### 9. object_store.js
 操作ObjectId标识的对象，根据自身分析情况可进行特定的序列化打印、操作对象的私有成员变量。将在高级篇讲解使用步骤。
+
+### 10. hook_RN.js
+对于动态注册的native函数，我们需要用hook_RN.js来分析。强烈建议hook_RN.js用spawn模式启动，启动命令为 ./spawn hook_RN.js
+
+![](assets/hook_RN.gif)
 
 # hooker调试命令行
 
@@ -380,10 +415,25 @@ hooker生成脚本和objection生成脚本优势对比
 | hooker      | j [class_name] -o [outputpath].js   |   能     |   包含     |   带apk version和生成命令     |   好     |
 | objection        |   android hooking generate simple [class_name]  |   不能（白纸一张）   |   不包含     |   不带     |   一般     |
 
+### k - 生成字符串hook脚本
+使用k 1821053，那么应用工作目录下会生成str_1821053.js。只要字符串产生并包含1821053这个关键词，就会打印产生地方的堆栈信息。原理基于java字符串拼接代码，编译后变成StringBuilder做append
+
+```java
+String url = "http://www.example.com/login?"+ "sign=" + getSign();
+```
+
+以上代码编译后会生成如下
+
+```java
+String url = new StringBuilder("http://www.example.com/login?").append("sign=").append(getSign()).toString();
+```
+
+不过这个思路有点儿类似暴力破解，而且非常影响app进程的运行速度，崩溃也是可能的。我的认为只要能搞出一些线索，崩溃也是值得的。崩溃我重启就是了。你觉得呢？
+
+
 
 hooker高级应用
 =================
-hooker最核心的功能是自动化生产frida脚本，这个功能直接让很多写通杀脚本的同行“痛恨”我。因为我让那些懒人也能快速使用上自定义的脚本，而不再依赖于一些割韭菜大佬的通杀脚本了。这影响了他们卖网课的转化率，所以我想对那些大佬说：“对不起，我是故意的”。
 
 ## radar.dex
 在hooker根目录中有一个radar.dex，这是为操作java类的增强库。
@@ -427,6 +477,63 @@ let dObj = getField(cObj, "d");
 ### 8. storeObjectAndLog(javaObject)
 将对象存储至对象缓存中，同时输出对象缓存id。然后你可以用c [objectId]，扫描对象，这将帮助你更好的窥视内存。该方法依赖radar.dex，使用前必须loadXRadarDexfile()。注意loadXRadarDexfile()进行一次即可，无需多次调用。
 
+## 原生ui自动化
+hooker借助radar.dex中gz.radar.AndroidUI的实现，将代码直接打到app进程当中实现直接操作View对象。这种效率已经超越了所有的三方自动化框架，因为无论哪种自动化框架都是基于C/S架构的，而hooker通过打补丁的方式是直接侵入式的修改app内部的代码逻辑。
+
+不过android_ui.js只是一个ui简单操作的体验工具，更高效的ui操作还是要结合每个应用实际情况定制patch代码。
+
+应用工作目录输入后./attach android_ui.js进入ui操作命令行，你可以操作以下几个方法
+
+### 1. startActivity(activityName)
+不传intent和action，强制启动一个Activity。比如，2020年4月份某信刚上视频号功能的时候，我的微信小号没有体验资格——也就是没有"视频号"那个按钮，不给我按钮我就启动不了了吗？按钮背后的逻辑就是执行了一个startActivity的操作，所以我就实现了这个方法————强制启动v信视频号的搜索界面。
+
+```js
+startActivity("com.tencent.mm.plugin.finder.search.FinderFeedSearchUI")
+```
+
+不过startActivity不一定成功，因为应用很多Activity都需要特定的intent和action，这个在应用的AndroidManifest.xml中有定义，另外你还有结合[activity_events.js](#2-activity_eventsjs)去参照原来的启动代码。比如我要强制打开一个用户资料的Activity，那你必须传一个userid或者uid什么数据给他，而且你还得知道它定义的数据方式。这时候你需要定位原来启动Activity代码，这就是[activity_events.js](#2-activity_eventsjs)的意义所在。比如，下面经过我的分析启动某一视频号作者主页面的代码应该这样实现。
+
+```java
+Intent intent = new Intent();
+intent.putExtra("finder_username", username);
+com.tencent.mm.plugin.finder.g.a aVar = com.tencent.mm.plugin.finder.g.a.pPL;
+com.tencent.mm.plugin.finder.g.a.enterFinderProfileUI(Android.getTopActivity(), intent);
+```
+
+### 2. contextStartActivity(activityName)
+contextStartActivity与startActivity不同，它会先获取应用的context。然后调用context的startActivity方法。
+
+### 3. topActivityStartActivity(activityName)
+topActivityStartActivity先获取栈顶的Activity实例，然后调用实例的startActivity方法。startActivity就是topActivityStartActivity。
+
+### 4. home()
+模拟点击home按钮
+
+### 5. back()
+模拟点击back按钮
+
+### 6. finishCurrentActivity()
+退出栈顶Activity。原理是先获取栈顶的Activity实例，然后调用其finish()方法来主动结束。
+
+### 7. clickByText(text)
+点击包含text文本的按钮。如果界面上存在多个包含text的按钮会优先选择找到的第一个。
+
+### 8. clickById(id)
+点击指定view id的按钮。你可以用uiautomatorviewer查看viewid，也可以用viewTree()方法输出view的json树来找到你要的元素。uiautomatorviewer在你{AndroidSdk}/tools/bin/路径下。
+
+### 9. hover(x,y,upStepLength)
+滑动屏幕。x,y传数字表示按下坐标，upStepLength的绝对值是步长表示滑动的长度。当upStepLength为正数的时候表示要向上滑动，当upStepLength为负数的时候表示向下滑动。
+
+### 10. viewTree()
+获取json格式的view树
+
+![](assets/android_ui_view_tree2.gif)
+![](assets/android_ui_view_tree.png)
+此ViewTree结果参考[viewTree.json](com.ss.android.ugc.aweme/viewTree.json "viewTree.json")
+
+
+
+
 ## 远程frida支持
 在hooker根目录有一个.hooker_driver文件，内容默认是-U表示通过usb连接frida-server。
 ```shell
@@ -442,8 +549,6 @@ stephen@ubuntu:~/hooker$ cat .hooker_driver
 
 hooker实战应用
 =================
-
-# https双向认证抓包
 
 # ssl_log链路层离线抓包
 
@@ -462,8 +567,6 @@ var author = {
 }
 ```
 
-# 加入hooker pro知识星球，每天分享行业最新干货。
-![soul](assets/soul.jpg)
 
 ### End
 [1]: https://github.com/frida/frida "frida"

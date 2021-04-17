@@ -135,11 +135,13 @@ def createHookingEnverment(packageName, mainActivity):
         os.makedirs(packageName+"/xinit")
         shellPrefix = "#!/bin/bash\nHOOKER_DRIVER=$(cat ../.hooker_driver)\n"
         logHooking = shellPrefix + "echo \"hooking $1\" > log\ndate | tee -ai log\n" + "frida $HOOKER_DRIVER -l $1 " + packageName + " | tee -ai log"
-        attachjs = shellPrefix + "frida $HOOKER_DRIVER -l $1 " + packageName
+        attach_shell = shellPrefix + "frida $HOOKER_DRIVER -l $1 " + packageName
+        spawn_shell = f"{shellPrefix}\nfrida $HOOKER_DRIVER --no-pause -f {packageName} -l $1"
         xinitPyScript = run_env.xinitPyScript + "xinitDeploy('"+packageName+"')"
         spiderPyScript = run_env.spiderPyScript.replace("{appPackageName}", packageName).replace("{mainActivity}", mainActivity) 
         createFile(packageName+"/hooking", logHooking)
-        createFile(packageName+"/attach", attachjs)
+        createFile(packageName+"/attach", attach_shell)
+        createFile(packageName+"/spawn", spawn_shell)
         createFile(packageName+"/xinitdeploy", xinitPyScript)
         createFile(packageName+"/spider.py", spiderPyScript)
         createFile(packageName + "/kill", shellPrefix + "frida-kill $HOOKER_DRIVER "+packageName)
@@ -149,15 +151,18 @@ def createHookingEnverment(packageName, mainActivity):
         os.popen('chmod 777 ' + packageName +'/xinitdeploy').readlines()
         os.popen('chmod 777 ' + packageName +'/kill').readlines()
         os.popen('chmod 777 ' + packageName +'/objection').readlines()
+        os.popen('chmod 777 ' + packageName +'/spawn').readlines()
         createFile(packageName + "/ssl_log.js", run_env.ssl_log_jscode)
         createFile(packageName + "/url.js", run_env.url_jscode)
         createFile(packageName + "/edit_text.js", run_env.edit_text_jscode)
         createFile(packageName + "/text_view.js", run_env.text_view_jscode)
         createFile(packageName + "/click.js", run_env.click_jscode)
+        createFile(packageName + "/hook_RN.js", run_env.hook_RN_jscode)
         createFile(packageName + "/keystore_dump.js", run_env.keystore_dump_jscode)
         createFile(packageName + "/android_ui.js", run_env.android_ui_jscode.replace("com.smile.gifmaker", packageName))
         createFile(packageName + "/activity_events.js", run_env.activity_events_jscode.replace("com.smile.gifmaker", packageName))
         createFile(packageName + "/object_store.js", run_env.object_store_jscode.replace("com.smile.gifmaker", packageName))
+        createFile(packageName + "/just_trust_me.js", run_env.just_trust_me_jscode.replace("com.smile.gifmaker", packageName))
 
 def hookJs(packageName, hookCmdArg, savePath = None):
     online_session = None
@@ -179,7 +184,8 @@ def hookJs(packageName, hookCmdArg, savePath = None):
             ganaretoionJscode += jscode
         
         if savePath == None:
-            savePath = packageName+"/"+str(uuid.uuid1())[0:6]+".js";
+            defaultFilename = hookCmdArg.replace(".", "_").replace(":", "_") + ".js"
+            savePath = packageName+"/"+defaultFilename;
         else:
             savePath = packageName+"/"+savePath;
         if len(ganaretoionJscode):

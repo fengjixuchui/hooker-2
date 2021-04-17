@@ -159,7 +159,7 @@ Java.perform(function() {
         try {
             if (BiddingHallRequestOkHttpCallMocker.loadEnv(this)) {
                 log("BiddingHallRequestOkHttpCallMocker加载环境成功!!!");
-            } 
+            }
             if (CheckReportRequestOkHttpCallMocker.loadEnv(this)){
                 log("CheckReportRequestOkHttpCallMocker加载环境成功!!!");
             }
